@@ -1,7 +1,3 @@
-use bevy::prelude::*;
-use egui::{Align, Layout, Ui};
-use phichain_chart::beat;
-
 use crate::editing::command::event::EditEvent;
 use crate::editing::command::note::EditNote;
 use crate::editing::command::{CommandSequence, EditorCommand};
@@ -9,19 +5,31 @@ use crate::editing::DoCommandEvent;
 use crate::selection::{Selected, SelectedLine};
 use crate::ui::latch;
 use crate::ui::widgets::beat_value::BeatExt;
-use crate::ui::widgets::easing_value::EasingValue;
+use crate::ui::widgets::easing::EasingValue;
+use bevy::prelude::*;
+use egui::{Align, Color32, DragValue, Layout, RichText, Ui};
+use phichain_chart::beat;
 use phichain_chart::event::{LineEvent, LineEventKind, LineEventValue};
 use phichain_chart::line::Line;
 use phichain_chart::note::{Note, NoteKind};
+use phichain_game::curve_note_track::CurveNoteTrack;
 
 pub fn inspector_ui_system(
     In(mut ui): In<Ui>,
+
     mut selected_notes: Query<(&mut Note, Entity), With<Selected>>,
     mut selected_events: Query<(&mut LineEvent, Entity), With<Selected>>,
     selected_line: Res<SelectedLine>,
     mut line_query: Query<&mut Line>,
     event_writer: EventWriter<DoCommandEvent>,
+
+    mut selected_track: Query<&mut CurveNoteTrack, With<Selected>>,
 ) {
+    if let Ok(mut track) = selected_track.get_single_mut() {
+        curve_note_track_inspector(&mut ui, &mut track);
+        return;
+    }
+
     let mut selected_notes: Vec<_> = selected_notes.iter_mut().collect();
     let mut selected_events: Vec<_> = selected_events.iter_mut().collect();
     if selected_notes.len() == 1 && selected_events.is_empty() {
@@ -37,6 +45,67 @@ pub fn inspector_ui_system(
     } else if let Ok(mut line) = line_query.get_mut(selected_line.0) {
         line_inspector(&mut ui, &mut line);
     }
+}
+
+fn curve_note_track_inspector(ui: &mut Ui, track: &mut CurveNoteTrack) {
+    match (track.from.is_some(), track.to.is_some()) {
+        (true, true) => {}
+        (true, false) => {
+            ui.label(
+                RichText::new(t!(
+                    "tab.inspector.curve_note_track.instructions.select_destination"
+                ))
+                .color(Color32::RED),
+            );
+            ui.separator();
+        }
+        (false, true) => {
+            ui.label(
+                RichText::new(t!(
+                    "tab.inspector.curve_note_track.instructions.select_origin"
+                ))
+                .color(Color32::RED),
+            );
+            ui.separator();
+        }
+        (false, false) => {
+            ui.label(
+                RichText::new(t!(
+                    "tab.inspector.curve_note_track.instructions.select_origin_destination"
+                ))
+                .color(Color32::RED),
+            );
+            ui.separator();
+        }
+    }
+
+    egui::Grid::new("inspector_grid")
+        .num_columns(2)
+        .spacing([20.0, 2.0])
+        .striped(true)
+        .show(ui, |ui| {
+            ui.label(t!("tab.inspector.curve_note_track.density"));
+            ui.add(
+                DragValue::new(&mut track.options.density)
+                    .clamp_range(1..=32)
+                    .speed(1),
+            );
+            ui.end_row();
+
+            ui.label(t!("tab.inspector.curve_note_track.kind"));
+            ui.horizontal(|ui| {
+                ui.selectable_value(&mut track.options.kind, NoteKind::Tap, "Tap");
+                ui.selectable_value(&mut track.options.kind, NoteKind::Drag, "Drag");
+                ui.selectable_value(&mut track.options.kind, NoteKind::Flick, "Flick");
+            });
+            ui.end_row();
+
+            ui.label(t!("tab.inspector.curve_note_track.curve"));
+            ui.add(EasingValue::new(&mut track.options.curve).show_graph(false));
+            ui.end_row();
+        });
+
+    ui.separator();
 }
 
 fn single_event_inspector(

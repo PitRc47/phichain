@@ -228,22 +228,18 @@ pub fn update_note_y_system(
                         transform.scale.y = height / 1900.0;
 
                         // hide notes behind line (cover)
-                        *visibility = if height < 0.0 {
-                            Visibility::Hidden
-                        } else {
-                            Visibility::Inherited
-                        };
+                        if height < 0.0 {
+                            *visibility = Visibility::Hidden;
+                        }
                     }
                     _ => {
                         sprite.anchor = Anchor::Center;
                         transform.rotation = Quat::from_rotation_z(0.0_f32.to_radians());
 
                         // hide notes behind line (cover)
-                        *visibility = if y < 0.0 {
-                            Visibility::Hidden
-                        } else {
-                            Visibility::Inherited
-                        };
+                        if y < 0.0 {
+                            *visibility = Visibility::Hidden;
+                        }
                     }
                 }
 
@@ -425,6 +421,10 @@ pub fn despawn_hold_component_system(
     for (parent, entity) in &component_query {
         let note = query.get(parent.get());
         if note.is_err() || note.is_ok_and(|n| !n.kind.is_hold()) {
+            // despawning children does not remove references for parent
+            // https://github.com/bevyengine/bevy/issues/12235
+            commands.entity(parent.get()).remove_children(&[entity]);
+
             commands.entity(entity).despawn();
         }
     }

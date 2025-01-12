@@ -17,6 +17,20 @@ tab:
     title: Timeline
   inspector:
     title: Inspector
+    curve_note_track:
+      start: Start Curve Note Track from Here
+      removed:
+        incomplete: 'A curve note track has been removed: missing origin or destination'
+        invalid: 'A curve note track has been removed: invalid origin or destination'
+        empty: 'A curve note track has been removed: does not contain any notes'
+      instructions:
+        confirm: Confirm the options and click 'Fill' to proceed or 'Cancel' to cancel
+        select_destination: Please select the destination
+        select_origin: Please select the origin
+        select_origin_destination: Please select the origin and the destination
+      density: Density
+      kind: Kind
+      curve: Curve
     single_note:
       x: X
       beat: Beat
@@ -123,6 +137,12 @@ tab:
         note_scale: Note Scale
         multi_highlight: Multi Highlight
         hit_effect_follow_game_time: Hit Effect Follow Game Time (DEBUG)
+      hotkey:
+        title: Hotkey
+        record: Record
+        recording: Recording
+        cancel: Cancel
+        reset: Reset
 
 project:
   save:
@@ -169,3 +189,23 @@ audio_setting:
 game:
   aspect_ratio:
     free: Free
+
+hotkey:
+  phichain.place_tap: Place Tap
+  phichain.place_drag: Place Drag
+  phichain.place_flick: Place Flick
+  phichain.place_hold: Place Hold
+  phichain.place_transition_event: Place Transition Event
+  phichain.place_constant_event: Place Constant Event
+  phichain.save_project: Save Project
+  phichain.close_project: Close Project
+  phichain.copy: Copy
+  phichain.paste: Paste
+  phichain.cut: Cut
+  phichain.undo: Undo
+  phichain.redo: Repo
+  phichain.pause_resume: Pause/Resume
+  phichain.forward: Forward
+  phichain.backward: Backward
+  phichain.take_screenshot: Take Screenshot
+  phichain.delete_selected: Delete Selected
