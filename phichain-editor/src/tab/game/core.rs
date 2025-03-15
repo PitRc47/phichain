@@ -1,4 +1,3 @@
-use super::GameCamera;
 use crate::editing::pending::Pending;
 use crate::project::project_loaded;
 use crate::selection::{Selected, SelectedLine};
@@ -17,8 +16,7 @@ pub struct CoreGamePlugin;
 
 impl Plugin for CoreGamePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, zoom_scale_system.run_if(project_loaded()))
-            .add_systems(Update, sync_game_config_system.run_if(project_loaded()))
+        app.add_systems(Update, sync_game_config_system.run_if(project_loaded()))
             .add_systems(Update, update_note_tint_system.run_if(project_loaded()))
             .add_systems(
                 Update,
@@ -39,18 +37,6 @@ impl Plugin for CoreGamePlugin {
     }
 }
 
-fn zoom_scale_system(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut query: Query<&mut OrthographicProjection, With<GameCamera>>,
-) {
-    let mut projection = query.single_mut();
-    if keyboard.pressed(KeyCode::KeyI) {
-        projection.scale /= 1.01;
-    } else if keyboard.pressed(KeyCode::KeyO) {
-        projection.scale *= 1.01;
-    }
-}
-
 fn update_note_tint_system(
     mut query: Query<
         (
@@ -64,9 +50,9 @@ fn update_note_tint_system(
 ) {
     for (mut sprite, curve_note, selected, pending) in &mut query {
         let tint = if selected.is_some() {
-            Color::LIME_GREEN
+            bevy::color::palettes::css::LIMEGREEN
         } else {
-            Color::WHITE
+            bevy::color::palettes::css::WHITE
         };
         let alpha = if pending.is_some() {
             40.0 / 255.0
@@ -75,7 +61,7 @@ fn update_note_tint_system(
         } else {
             1.0
         };
-        sprite.color = tint.with_a(alpha);
+        sprite.color = tint.with_alpha(alpha).into();
     }
 }
 
@@ -114,7 +100,9 @@ fn update_line_tint_system(
     }
     for (mut sprite, entity) in &mut query {
         if entity == selected_line.0 {
-            sprite.color = Color::LIME_GREEN.with_a(sprite.color.a());
+            sprite.color = bevy::color::palettes::css::LIMEGREEN
+                .with_alpha(sprite.color.alpha())
+                .into();
         }
     }
 }
@@ -137,7 +125,7 @@ fn create_anchor_marker_system(mut commands: Commands, query: Query<Entity, Adde
                     ..default()
                 },
                 Fill::color(Color::WHITE),
-                Stroke::color(Color::LIME_GREEN),
+                Stroke::color(bevy::color::palettes::css::LIMEGREEN),
             ));
         });
     }
@@ -154,7 +142,7 @@ fn update_anchor_marker_system(
                 ShowLineAnchorOption::Never => Visibility::Hidden,
                 ShowLineAnchorOption::Always => Visibility::Inherited,
                 ShowLineAnchorOption::Visible => {
-                    if sprite.color.a() > 0.0 {
+                    if sprite.color.alpha() > 0.0 {
                         Visibility::Visible
                     } else {
                         Visibility::Hidden

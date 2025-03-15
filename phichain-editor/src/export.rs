@@ -1,32 +1,64 @@
-use crate::file::{PickingEvent, PickingKind};
+use crate::action::ActionRegistrationExt;
+use crate::file::{pick_folder, PickingEvent, PickingKind};
+use crate::hotkey::modifier::Modifier;
+use crate::hotkey::Hotkey;
 use crate::notification::{ToastsExt, ToastsStorage};
 use crate::project::{project_loaded, Project};
-use anyhow::{bail, Context};
+use anyhow::Context;
 use bevy::app::App;
 use bevy::prelude::*;
 use phichain_chart::format::official::OfficialChart;
 use phichain_chart::primitive::Format;
 use phichain_chart::serialization::PhichainChart;
+use rfd::FileDialog;
 use std::fs;
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use zip::write::SimpleFileOptions;
 
 pub struct ExportPlugin;
 
 impl Plugin for ExportPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, export_official_system.run_if(project_loaded()));
+        app.add_systems(Update, export_official_system.run_if(project_loaded()))
+            .add_action(
+                "phichain.export_as_official",
+                export_as_official_system,
+                Some(Hotkey::new(
+                    KeyCode::KeyO,
+                    vec![Modifier::Control, Modifier::Shift],
+                )),
+            );
     }
 }
 
-fn export_official(path: &Path, project: &Project) -> anyhow::Result<()> {
-    let zip_path = path.join("chart.zip");
-    if zip_path.exists() {
-        bail!("chart.zip already exists in the folder");
-    }
+fn export_as_official_system(world: &mut World) {
+    pick_folder(world, PickingKind::ExportOfficial, FileDialog::new());
+}
 
-    let file = fs::File::create(zip_path)?;
+/// Generates the export path under a path, ensuring the path does not already exist
+fn get_export_path(path: &Path, index: usize) -> Option<PathBuf> {
+    if index >= 10 {
+        None
+    } else {
+        let zip_path = path.join(if index == 0 {
+            "chart.zip".to_string()
+        } else {
+            format!("chart({}).zip", index)
+        });
+
+        if zip_path.exists() {
+            get_export_path(path, index + 1)
+        } else {
+            Some(zip_path)
+        }
+    }
+}
+
+fn export_official(path: &Path, project: &Project) -> anyhow::Result<PathBuf> {
+    let zip_path = get_export_path(path, 0).context("Failed to get export path")?;
+
+    let file = fs::File::create(&zip_path)?;
 
     let mut zip = zip::ZipWriter::new(file);
 
@@ -83,7 +115,7 @@ Charter: {}
 
     zip.finish()?;
 
-    Ok(())
+    Ok(zip_path)
 }
 
 fn export_official_system(
@@ -101,11 +133,11 @@ fn export_official_system(
         };
 
         match export_official(path, &project) {
-            Ok(_) => {
-                toasts.success("Successfully exported official chart");
+            Ok(path) => {
+                toasts.success(t!("export.official.success", path = path.to_string_lossy()));
             }
             Err(error) => {
-                toasts.error(format!("Failed to export official chart: {}", error));
+                toasts.error(t!("export.official.failed", error = error));
             }
         }
     }

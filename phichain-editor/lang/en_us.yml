@@ -8,13 +8,15 @@ menu_bar:
     title: Windows
   export:
     title: Export
-    as_official: Export as official
+    as_official: Export as Official
 
 tab:
   game:
     title: Preview
   timeline:
     title: Timeline
+    event:
+      jump_to_event: Jump to this event
   inspector:
     title: Inspector
     curve_note_track:
@@ -24,7 +26,6 @@ tab:
         invalid: 'A curve note track has been removed: invalid origin or destination'
         empty: 'A curve note track has been removed: does not contain any notes'
       instructions:
-        confirm: Confirm the options and click 'Fill' to proceed or 'Cancel' to cancel
         select_destination: Please select the destination
         select_origin: Please select the origin
         select_origin_destination: Please select the origin and the destination
@@ -106,6 +107,8 @@ tab:
     hierarchy:
       as_child_of_current_line: As child of current line
       move_to_root: Move to root
+      add_parent: Add Parent
+      add_child: Add Child
   bpm_list:
     title: BPM List
     new: New BPM Point
@@ -186,6 +189,11 @@ audio_setting:
   save:
     failed: 'Failed to save audio settings: %{error}'
 
+export:
+  official:
+    success: Successfully exported to %{path}
+    failed: 'Failed to export official chart: %{path}'
+
 game:
   aspect_ratio:
     free: Free
@@ -212,3 +220,13 @@ action:
   phichain.take_screenshot: Take Screenshot
   phichain.delete_selected: Delete Selected
   phichain.open_action_panel: Open Action Panel
+
+  phichain.zoom_in: Zoom In 25%
+  phichain.zoom_out: Zoom Out 25%
+  phichain.reset_zoom: Reset Zoom to 100%
+
+  phichain.export_as_official: Export as Official
+
+  phichain.create_line: Create Line
+
+  phichain.open_in_file_manager: Open Project in File Manager

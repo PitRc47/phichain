@@ -29,6 +29,7 @@ mod timing;
 mod translation;
 mod ui;
 mod utils;
+mod zoom;
 
 use crate::action::{ActionPlugin, ActionRegistry};
 use crate::audio::AudioPlugin;
@@ -37,12 +38,12 @@ use crate::editing::history::EditorHistory;
 use crate::editing::EditingPlugin;
 use crate::events::EventPlugin;
 use crate::export::ExportPlugin;
-use crate::file::{pick_folder, FilePickingPlugin, PickingKind};
+use crate::file::FilePickingPlugin;
 use crate::hit_sound::HitSoundPlugin;
 use crate::home::HomePlugin;
 use crate::hotkey::HotkeyPlugin;
 use crate::identifier::{Identifier, IntoIdentifier};
-use crate::misc::MiscPlugin;
+use crate::misc::{MiscPlugin, WorkingDirectory};
 use crate::notification::NotificationPlugin;
 use crate::project::project_loaded;
 use crate::project::LoadProjectEvent;
@@ -61,23 +62,25 @@ use crate::timeline::TimelinePlugin;
 use crate::timing::TimingPlugin;
 use crate::translation::TranslationPlugin;
 use crate::ui::UiPlugin;
+use crate::zoom::ZoomPlugin;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
+use bevy::log::tracing_subscriber::Layer;
+use bevy::log::{tracing_subscriber, BoxedLayer, LogPlugin};
 use bevy::prelude::*;
 use bevy::render::render_resource::WgpuFeatures;
 use bevy::render::settings::WgpuSettings;
 use bevy::render::RenderPlugin;
 use bevy_egui::egui::{Color32, Frame};
 use bevy_egui::{EguiContext, EguiPlugin};
-use bevy_mod_picking::prelude::*;
 use bevy_persistent::Persistent;
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
 use phichain_assets::AssetsPlugin;
 use phichain_chart::event::LineEvent;
 use phichain_chart::note::Note;
 use phichain_game::{GamePlugin, GameSet};
-use rfd::FileDialog;
 use rust_i18n::set_locale;
 use std::env;
+use std::sync::Arc;
 
 i18n!("lang", fallback = "en_us");
 
@@ -107,10 +110,24 @@ fn main() {
         .add_plugins(TranslationPlugin)
         .add_plugins(RecentProjectsPlugin)
         .add_plugins(HomePlugin)
-        .add_plugins(DefaultPlugins.set(RenderPlugin {
-            render_creation: wgpu_settings.into(),
-            synchronous_pipeline_compilation: false,
-        }))
+        .add_plugins(
+            DefaultPlugins
+                .set(RenderPlugin {
+                    render_creation: wgpu_settings.into(),
+                    synchronous_pipeline_compilation: false,
+                })
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Phichain".to_string(),
+                        ..default()
+                    }),
+                    ..default()
+                })
+                .set(LogPlugin {
+                    custom_layer,
+                    ..default()
+                }),
+        )
         .add_plugins(GamePlugin)
         .add_plugins(ActionPlugin)
         .add_plugins(ScreenshotPlugin)
@@ -120,7 +137,6 @@ fn main() {
         .add_plugins(HitSoundPlugin)
         .add_plugins(GameTabPlugin)
         .add_plugins(TimelinePlugin)
-        .add_plugins(DefaultPickingPlugins)
         .add_plugins(EguiPlugin)
         .add_plugins(ProjectPlugin)
         .add_plugins(ExportPlugin)
@@ -132,15 +148,36 @@ fn main() {
         .add_plugins(NotificationPlugin)
         .add_plugins(FilePickingPlugin)
         .add_plugins(EventPlugin)
+        .add_plugins(ZoomPlugin)
         .add_systems(Startup, setup_egui_image_loader_system)
         .add_systems(Startup, setup_egui_font_system)
-        .add_systems(Startup, setup_plugin)
+        .add_systems(Startup, setup_system)
         .add_systems(Update, ui_system.run_if(project_loaded()))
         .add_systems(
             Startup,
             (apply_args_config_system, apply_editor_settings_system),
         )
         .run();
+}
+
+/// Hold the [`tracing_appender`] guard
+#[derive(Resource)]
+#[allow(dead_code)]
+struct LogGuard(tracing_appender::non_blocking::WorkerGuard);
+
+fn custom_layer(app: &mut App) -> Option<BoxedLayer> {
+    let path = app.world().resource::<WorkingDirectory>().log().ok()?;
+
+    let appender = tracing_appender::rolling::never(path, "phichain.log");
+
+    let (non_blocking, guard) = tracing_appender::non_blocking(appender);
+
+    app.insert_resource(LogGuard(guard));
+
+    Some(Box::new(vec![tracing_subscriber::fmt::layer()
+        .with_writer(non_blocking)
+        .with_ansi(false)
+        .boxed()]))
 }
 
 fn apply_editor_settings_system(settings: Res<Persistent<EditorSettings>>) {
@@ -172,7 +209,9 @@ fn setup_egui_font_system(mut contexts: bevy_egui::EguiContexts) {
 
     let font_data = egui::FontData::from_owned(font_file_bytes);
     let mut font_def = egui::FontDefinitions::default();
-    font_def.font_data.insert(font_name.to_string(), font_data);
+    font_def
+        .font_data
+        .insert(font_name.to_string(), Arc::new(font_data));
 
     let font_family: egui::FontFamily = egui::FontFamily::Proportional;
     font_def
@@ -277,6 +316,9 @@ fn ui_system(world: &mut World) {
     };
     let mut egui_context = egui_context.clone();
     let ctx = egui_context.get_mut();
+    // TODO: move egui options to one place
+    // ctrl+plus / ctrl+minus / ctrl+zero is used for game viewport zooming in phichain. enabling this will cause ui glitch when using these hotkeys
+    ctx.options_mut(|options| options.zoom_with_keyboard = false);
 
     let diagnostics = world.resource::<DiagnosticsStore>();
     let mut fps = 0.0;
@@ -338,7 +380,10 @@ fn ui_system(world: &mut World) {
 
             ui.menu_button(t!("menu_bar.export.title"), |ui| {
                 if ui.button(t!("menu_bar.export.as_official")).clicked() {
-                    pick_folder(world, PickingKind::ExportOfficial, FileDialog::new());
+                    // TODO: make menu bar powered by actions
+                    world.resource_scope(|world, mut actions: Mut<ActionRegistry>| {
+                        actions.run_action(world, "phichain.export_as_official");
+                    });
                     ui.close_menu();
                 }
             });
@@ -406,15 +451,6 @@ fn ui_system(world: &mut World) {
         });
 }
 
-fn setup_plugin(mut commands: Commands) {
-    commands.spawn((
-        Camera2dBundle {
-            camera: Camera {
-                order: 0,
-                ..default()
-            },
-            ..default()
-        },
-        GameCamera,
-    ));
+fn setup_system(mut commands: Commands) {
+    commands.spawn((Camera2d, GameCamera));
 }
