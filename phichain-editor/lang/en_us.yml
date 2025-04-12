@@ -131,6 +131,11 @@ tab:
           never: Never
           always: Always
           visible: Visible Lines Only
+        send_telemetry:
+          label: Send Telemetry
+          description: Whether to send telemetry data. Learn more about telemetry by visiting https://phicha.in/telemetry
+          disabled_by_env_var: Telemetry disabled by environment variable
+          debug_enabled: Telemetry debug enabled
         language:
           label: Language
           description: The language used by the editor
@@ -206,6 +211,8 @@ home:
     create: Create Project
 
     music_unselected: Music is not selected
+  settings: Editor Settings
+  telemetry: Telemetry
 
 audio_setting:
   save:

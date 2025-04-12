@@ -131,6 +131,11 @@ tab:
           never: 从不
           always: 总是
           visible: 仅可见判定线
+        send_telemetry:
+          label: 发送遥测
+          description: 是否发送遥测数据。了解更多关于遥测的信息，请访问 https://phicha.in/telemetry
+          disabled_by_env_var: 遥测被环境变量禁用
+          debug_enabled: 遥测调试启用
         language:
           label: 语言
           description: 编辑器使用的语言
@@ -206,6 +211,8 @@ home:
     create: 创建项目
 
     music_unselected: 未选择音乐
+  settings: 编辑器设置
+  telemetry: 遥测
 
 audio_setting:
   save:

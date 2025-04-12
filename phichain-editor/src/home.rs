@@ -1,17 +1,20 @@
-use std::path::PathBuf;
-
-use bevy::prelude::*;
-use bevy_egui::EguiContext;
-use bevy_persistent::Persistent;
-use egui::{Align2, RichText, ScrollArea, Sense};
-use rfd::FileDialog;
-
 use crate::recent_projects::{PersistentRecentProjectsExt, RecentProjects};
+use crate::settings::EditorSettings;
+use crate::tab::settings::settings_ui;
+use crate::translation::Languages;
+use crate::ui::widgets::language_combobox::language_combobox;
 use crate::{
     file::{pick_file, pick_folder, PickingEvent, PickingKind},
     notification::{ToastsExt, ToastsStorage},
     project::{create_project, project_not_loaded, LoadProjectEvent, ProjectMeta},
 };
+use bevy::prelude::*;
+use bevy_egui::EguiContext;
+use bevy_persistent::Persistent;
+use egui::{Color32, CursorIcon, Id, RichText, ScrollArea, Sense};
+use egui_flex::{item, Flex};
+use rfd::FileDialog;
+use std::path::PathBuf;
 
 #[derive(Resource, Debug, Default)]
 pub struct CreateProjectForm {
@@ -25,6 +28,10 @@ pub struct CreateProjectForm {
 /// This should always be removed after sending [`LoadProjectEvent`]
 #[derive(Resource, Debug, Default)]
 pub struct CreatingProject;
+
+/// Marker resource to control the visibility of the settings screen
+#[derive(Resource, Debug, Default)]
+pub struct OpenSettings;
 
 pub struct HomePlugin;
 
@@ -57,17 +64,38 @@ fn ui_system(world: &mut World) {
     ctx.options_mut(|options| options.zoom_with_keyboard = false);
 
     egui::CentralPanel::default().show(ctx, |ui| {
+        let frame_time = ui.ctx().input(|i| i.time);
+        if frame_time == 0.0 {
+            return;
+        }
+
+        if world.get_resource::<OpenSettings>().is_some() {
+            ui.horizontal(|ui| {
+                if ui
+                    .heading(egui_phosphor::regular::ARROW_LEFT)
+                    .on_hover_cursor(CursorIcon::PointingHand)
+                    .on_hover_and_drag_cursor(CursorIcon::PointingHand)
+                    .clicked()
+                {
+                    world.remove_resource::<OpenSettings>();
+                }
+                ui.heading(t!("home.settings"));
+            });
+            ui.separator();
+            settings_ui(ui, world);
+
+            return;
+        }
+
         ui.heading(format!("Phichain v{}", env!("CARGO_PKG_VERSION")));
 
         ui.separator();
 
-        let mut open = world.contains_resource::<CreatingProject>();
-        egui::Window::new(t!("home.create_project.label"))
-            .collapsible(false)
-            .resizable([true, false])
-            .anchor(Align2::CENTER_CENTER, egui::Vec2::ZERO)
-            .open(&mut open)
-            .show(ctx, |ui| {
+        if world.contains_resource::<CreatingProject>() {
+            let modal = egui::Modal::new(Id::new("home.settings")).show(ctx, |ui| {
+                ui.set_width(400.0);
+                ui.heading(t!("home.create_project.label"));
+                ui.separator();
                 egui::Grid::new("create_project_grid")
                     .num_columns(2)
                     .spacing([20.0, 2.0])
@@ -143,17 +171,51 @@ fn ui_system(world: &mut World) {
                 }
             });
 
-        if !open {
-            world.remove_resource::<CreatingProject>();
+            if modal.should_close() {
+                world.remove_resource::<CreatingProject>();
+            }
         }
 
-        ui.horizontal(|ui| {
-            if ui.button(t!("home.open_project.load")).clicked() {
-                pick_folder(world, PickingKind::OpenProject, FileDialog::new());
-            }
-            if ui.button(t!("home.create_project.create")).clicked() {
-                world.insert_resource(CreatingProject);
-            }
+        Flex::horizontal().w_full().show(ui, |flex| {
+            flex.add_ui(item().shrink(), |ui| {
+                ui.horizontal(|ui| {
+                    if ui.button(t!("home.open_project.load")).clicked() {
+                        pick_folder(world, PickingKind::OpenProject, FileDialog::new());
+                    }
+                    if ui.button(t!("home.create_project.create")).clicked() {
+                        world.insert_resource(CreatingProject);
+                    }
+                });
+            });
+            flex.grow();
+            flex.add_ui(item(), |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new(format!(
+                            "{} {}",
+                            egui_phosphor::regular::GLOBE,
+                            t!("tab.settings.category.general.language.label")
+                        ))
+                        .color(Color32::LIGHT_BLUE),
+                    );
+                    let languages = world.resource::<Languages>().0.clone();
+                    let mut editor_settings = world.resource_mut::<Persistent<EditorSettings>>();
+                    if language_combobox(ui, languages, &mut editor_settings.general.language) {
+                        let _ = editor_settings.persist();
+                    }
+
+                    if ui.button(t!("home.settings")).clicked() {
+                        world.insert_resource(OpenSettings);
+                    }
+
+                    let mut editor_settings = world.resource_mut::<Persistent<EditorSettings>>();
+
+                    ui.checkbox(
+                        &mut editor_settings.general.send_telemetry,
+                        t!("home.telemetry"),
+                    );
+                })
+            });
         });
 
         ui.separator();
@@ -195,8 +257,8 @@ fn ui_system(world: &mut World) {
                     );
                 })
                 .response
-                .on_hover_cursor(egui::CursorIcon::PointingHand)
-                .on_hover_and_drag_cursor(egui::CursorIcon::PointingHand);
+                .on_hover_cursor(CursorIcon::PointingHand)
+                .on_hover_and_drag_cursor(CursorIcon::PointingHand);
             }
         });
         ui.style_mut().interaction.selectable_labels = true;
