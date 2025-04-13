@@ -2,7 +2,8 @@ use crate::hotkey::{Hotkey, HotkeyContext, HotkeyExt};
 use crate::identifier::Identifier;
 use crate::telemetry::PushTelemetryEvent;
 use bevy::ecs::system::SystemState;
-use bevy::{prelude::*, utils::HashMap};
+use bevy::prelude::*;
+use indexmap::IndexMap;
 use phichain_game::GameSet;
 use serde_json::json;
 
@@ -20,7 +21,7 @@ impl RegisteredAction {
 }
 
 #[derive(Resource, Deref, Default)]
-pub struct ActionRegistry(pub HashMap<ActionIdentifier, RegisteredAction>);
+pub struct ActionRegistry(pub IndexMap<ActionIdentifier, RegisteredAction>);
 
 impl ActionRegistry {
     pub fn run_action(&mut self, world: &mut World, id: impl Into<ActionIdentifier>) {
@@ -66,20 +67,19 @@ impl ActionRegistrationExt for App {
     ) -> &mut Self {
         let id = id.into();
 
+        let action = RegisteredAction {
+            system: Box::new({
+                let mut sys = IntoSystem::into_system(system);
+                sys.initialize(self.world_mut());
+                sys
+            }),
+            enable_hotkey: hotkey.is_some(),
+        };
+
         self.world_mut()
-            .resource_scope(|world, mut registry: Mut<ActionRegistry>| {
-                registry.0.insert(
-                    id.clone(),
-                    RegisteredAction {
-                        system: Box::new({
-                            let mut sys = IntoSystem::into_system(system);
-                            sys.initialize(world);
-                            sys
-                        }),
-                        enable_hotkey: hotkey.is_some(),
-                    },
-                )
-            });
+            .resource_mut::<ActionRegistry>()
+            .0
+            .insert(id.clone(), action);
 
         if let Some(hotkey) = hotkey {
             self.add_hotkey(id, hotkey);
