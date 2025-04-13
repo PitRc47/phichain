@@ -11,3 +11,16 @@ Chart*.json
 # medias
 *.mp4
 *.mov
+config/hotkey.yml
+config/recent_projects.yml
+config/settings.yml
+lang/en_us.yml
+lang/meta.json
+lang/zh_cn.yml
+logs/phichain.log
+phichain-converter.exe
+phichain-renderer.exe
+phichain.exe
+temp/illustration.png
+temp/meta.json
+temp/music.ogg
