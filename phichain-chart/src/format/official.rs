@@ -276,7 +276,10 @@ impl Format for OfficialChart {
         Self: Sized,
     {
         fn cut_event(event: primitive::event::LineEvent) -> Vec<primitive::event::LineEvent> {
-            if matches!(event.easing, Easing::Linear) {
+            if event.start == event.end {
+                return vec![event];
+            }
+            if matches!(event.easing, Easing::Linear) && !event.kind.is_speed() {
                 return vec![event];
             }
 
@@ -345,8 +348,8 @@ impl Format for OfficialChart {
                     split_beats.push(event.end_beat);
                 }
                 split_beats.push(beat!(1000000000));
-                split_beats.dedup();
                 split_beats.sort();
+                split_beats.dedup();
 
                 let mut connected_events = vec![];
 
@@ -361,7 +364,7 @@ impl Format for OfficialChart {
                     let end = evaluate(&events, end_beat, false);
 
                     connected_events.push(primitive::event::LineEvent {
-                        kind: LineEventKind::X, // does not matter
+                        kind: events.first().unwrap().kind,
                         start,
                         end,
                         easing: Easing::Linear,
@@ -380,6 +383,7 @@ impl Format for OfficialChart {
                 target: &mut Vec<T>,
             ) where
                 F: FnMut(&primitive::event::LineEvent) -> T,
+                T: std::fmt::Debug,
             {
                 let events = connect_events(
                     &line
@@ -486,8 +490,8 @@ impl Format for OfficialChart {
                 split_beats.push(event.end_beat);
             }
             split_beats.push(beat!(1000000000));
-            split_beats.dedup();
             split_beats.sort();
+            split_beats.dedup();
 
             for i in 0..split_beats.len() - 1 {
                 let start_beat = split_beats[i];

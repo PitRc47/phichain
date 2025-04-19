@@ -51,7 +51,7 @@ impl Plugin for ProjectPlugin {
                 },
                 Some(Hotkey::new(KeyCode::KeyW, vec![Modifier::Control])),
             )
-            .add_action(
+            .add_heavy_action(
                 "phichain.open_in_file_manager",
                 |project: Res<Project>| {
                     let _ = open::that(project.path.0.clone());
@@ -119,12 +119,12 @@ fn load_project_system(
                     toasts.error(format!("Failed to load chart: {:?}", error));
                     telemetry.send(PushTelemetryEvent::new(
                         "phichain.editor.project.load.failed",
-                        json!({ "duration": start.elapsed().as_secs_f32() }),
+                        json!({ "duration": start.elapsed().as_millis() }),
                     ));
                 } else {
                     telemetry.send(PushTelemetryEvent::new(
                         "phichain.editor.project.loaded",
-                        json!({ "duration": start.elapsed().as_secs_f32() }),
+                        json!({ "duration": start.elapsed().as_millis() }),
                     ));
                     recent_projects.push(RecentProject::new(
                         project.meta.name.clone(),
